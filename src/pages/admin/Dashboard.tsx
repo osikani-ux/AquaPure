@@ -65,6 +65,24 @@ export default function AdminDashboard() {
   // Note form state
   const [noteText, setNoteText] = useState('');
   
+  // Services state
+  const [services, setServices] = useState([
+    { id: '1', name: 'Essential Tank Clean', description: 'Basic tank cleaning service for small residential tanks. Includes drainage, sediment removal, scrubbing, and rinsing.', price: 150, active: true },
+    { id: '2', name: 'Professional Tank Care', description: 'Our standard residential service with complete cleaning, disinfection, inspection, and service record.', price: 250, active: true },
+    { id: '3', name: 'Premium Tank Care', description: 'Comprehensive maintenance with detailed assessment, before/after photos, and detailed service report.', price: 350, active: true },
+    { id: '4', name: 'Commercial Tank Service', description: 'Scheduled cleaning services for businesses, institutions, and large properties.', price: 500, active: true },
+    { id: '5', name: 'Annual Care Plan', description: 'Scheduled maintenance throughout the year with routine inspections and reminders.', price: 0, active: true },
+    { id: '6', name: 'Property Management', description: 'Recurring cleaning and maintenance plans for landlords and property managers.', price: 0, active: true },
+  ]);
+  const [editingService, setEditingService] = useState<typeof services[0] | null>(null);
+  const [serviceEditForm, setServiceEditForm] = useState({
+    name: '',
+    description: '',
+    price: 0,
+    active: true
+  });
+  const [serviceEditSuccess, setServiceEditSuccess] = useState(false);
+  
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -159,6 +177,46 @@ export default function AdminDashboard() {
     setTimeout(() => {
       setNoteSuccess(false);
     }, 2000);
+  };
+
+  // Handle opening edit service modal
+  const handleOpenEditService = (service: typeof services[0]) => {
+    setEditingService(service);
+    setServiceEditForm({
+      name: service.name,
+      description: service.description,
+      price: service.price,
+      active: service.active
+    });
+  };
+
+  // Handle saving edited service
+  const handleSaveService = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingService) return;
+    
+    setServices(prev => prev.map(s => 
+      s.id === editingService.id 
+        ? { ...s, ...serviceEditForm }
+        : s
+    ));
+    
+    setServiceEditSuccess(true);
+    
+    setTimeout(() => {
+      setEditingService(null);
+      setServiceEditSuccess(false);
+      setServiceEditForm({ name: '', description: '', price: 0, active: true });
+    }, 1500);
+  };
+
+  // Handle toggling service active status
+  const handleToggleService = (serviceId: string) => {
+    setServices(prev => prev.map(s => 
+      s.id === serviceId 
+        ? { ...s, active: !s.active }
+        : s
+    ));
   };
 
   const filteredBookings = bookings.filter(b => {
@@ -927,29 +985,188 @@ export default function AdminDashboard() {
 
           {activePage === 'services' && (
             <div className="space-y-6">
+              {/* Header with Add New button */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-navy-900">Manage Services</h2>
+                  <p className="text-sm text-navy-500">Edit service details and manage active status</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setEditingService({ id: 'new', name: '', description: '', price: 0, active: true });
+                    setServiceEditForm({ name: '', description: '', price: 0, active: true });
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-aqua-600 to-cyan-600 text-white rounded-xl font-semibold text-sm shadow-lg hover:shadow-xl transition-all"
+                >
+                  + Add New Service
+                </button>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[
-                  { name: 'Essential Tank Clean', price: 150, active: true },
-                  { name: 'Professional Tank Care', price: 250, active: true },
-                  { name: 'Premium Tank Care', price: 350, active: true },
-                  { name: 'Commercial Tank Service', price: 500, active: true },
-                  { name: 'Annual Care Plan', price: 0, active: true },
-                  { name: 'Property Management', price: 0, active: true },
-                ].map((service, i) => (
-                  <div key={i} className="bg-white rounded-xl border border-navy-100 p-5 shadow-sm">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-bold text-navy-900">{service.name}</h3>
+                {services.map((service) => (
+                  <div key={service.id} className={`bg-white rounded-xl border p-5 shadow-sm transition-all ${service.active ? 'border-navy-100' : 'border-red-200 opacity-75'}`}>
+                    <div className="flex items-start justify-between mb-3">
+                      <h3 className={`font-bold ${service.active ? 'text-navy-900' : 'text-navy-500'}`}>{service.name}</h3>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${service.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                         {service.active ? 'Active' : 'Inactive'}
                       </span>
                     </div>
-                    <p className="text-2xl font-bold text-aqua-600">{service.price > 0 ? `From ${formatGHS(service.price)}` : 'Custom'}</p>
-                    <button className="mt-3 flex items-center gap-1 text-sm text-aqua-600 font-semibold hover:text-aqua-700">
-                      <Edit className="w-4 h-4" /> Edit
-                    </button>
+                    <p className={`text-sm mb-3 line-clamp-2 ${service.active ? 'text-navy-600' : 'text-navy-400'}`}>
+                      {service.description}
+                    </p>
+                    <p className={`text-2xl font-bold mb-4 ${service.active ? 'text-aqua-600' : 'text-navy-400'}`}>
+                      {service.price > 0 ? `From ${formatGHS(service.price)}` : 'Custom'}
+                    </p>
+                    
+                    <div className="flex items-center gap-2 pt-3 border-t border-navy-100">
+                      <button 
+                        onClick={() => handleOpenEditService(service)}
+                        className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-aqua-600 font-semibold hover:bg-aqua-50 rounded-lg transition-colors"
+                      >
+                        <Edit className="w-4 h-4" /> Edit
+                      </button>
+                      <button 
+                        onClick={() => handleToggleService(service.id)}
+                        className={`flex-1 flex items-center justify-center gap-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                          service.active 
+                            ? 'text-red-600 hover:bg-red-50' 
+                            : 'text-green-600 hover:bg-green-50'
+                        }`}
+                      >
+                        {service.active ? (
+                          <>
+                            <XCircle className="w-4 h-4" /> Deactivate
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-4 h-4" /> Activate
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
+
+              {/* Edit Service Modal */}
+              {editingService && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => !serviceEditSuccess && setEditingService(null)}>
+                  <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="p-6 border-b border-navy-100">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-bold text-navy-900">
+                            {editingService.id === 'new' ? 'Add New Service' : 'Edit Service'}
+                          </h3>
+                          <p className="text-sm text-navy-500 mt-1">
+                            {editingService.id === 'new' ? 'Create a new service offering' : `Editing ${editingService.name}`}
+                          </p>
+                        </div>
+                        {!serviceEditSuccess && (
+                          <button onClick={() => setEditingService(null)} className="p-2 rounded-lg hover:bg-navy-50">
+                            <XCircle className="w-5 h-5 text-navy-400" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {serviceEditSuccess ? (
+                      <div className="p-8 text-center">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-clean-50 flex items-center justify-center">
+                          <CheckCircle2 className="w-10 h-10 text-clean-500" />
+                        </div>
+                        <h4 className="text-xl font-bold text-navy-900 mb-2">
+                          {editingService.id === 'new' ? 'Service Added!' : 'Service Updated!'}
+                        </h4>
+                        <p className="text-navy-600">
+                          {editingService.id === 'new' 
+                            ? 'The new service has been added successfully.' 
+                            : 'The service details have been updated.'}
+                        </p>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleSaveService} className="p-6 space-y-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-navy-700 mb-1.5">Service Name *</label>
+                          <input 
+                            type="text"
+                            required
+                            value={serviceEditForm.name}
+                            onChange={(e) => setServiceEditForm(prev => ({ ...prev, name: e.target.value }))}
+                            className="w-full px-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 focus:border-aqua-500 outline-none"
+                            placeholder="e.g., Premium Tank Care"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-semibold text-navy-700 mb-1.5">Description *</label>
+                          <textarea 
+                            required
+                            rows={3}
+                            value={serviceEditForm.description}
+                            onChange={(e) => setServiceEditForm(prev => ({ ...prev, description: e.target.value }))}
+                            className="w-full px-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none resize-none"
+                            placeholder="Describe what this service includes..."
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-semibold text-navy-700 mb-1.5">Starting Price (GH₵)</label>
+                          <input 
+                            type="number"
+                            min="0"
+                            value={serviceEditForm.price}
+                            onChange={(e) => setServiceEditForm(prev => ({ ...prev, price: parseInt(e.target.value) || 0 }))}
+                            className="w-full px-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none"
+                            placeholder="0 for custom pricing"
+                          />
+                          <p className="text-xs text-navy-500 mt-1">Enter 0 for custom/quote-based pricing</p>
+                        </div>
+                        
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-navy-50/50 border border-navy-100">
+                          <div>
+                            <p className="font-semibold text-navy-800">Service Status</p>
+                            <p className="text-xs text-navy-500 mt-0.5">
+                              {serviceEditForm.active 
+                                ? 'Service is visible to customers' 
+                                : 'Service is hidden from customers'}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setServiceEditForm(prev => ({ ...prev, active: !prev.active }))}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                              serviceEditForm.active ? 'bg-green-500' : 'bg-navy-300'
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                serviceEditForm.active ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                        
+                        <div className="flex gap-3 pt-2">
+                          <button 
+                            type="button"
+                            onClick={() => setEditingService(null)}
+                            className="flex-1 py-3 border-2 border-navy-200 text-navy-800 rounded-xl font-semibold hover:bg-navy-50 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button 
+                            type="submit"
+                            className="flex-1 py-3 bg-gradient-to-r from-aqua-600 to-cyan-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all"
+                          >
+                            {editingService.id === 'new' ? 'Add Service' : 'Save Changes'}
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
