@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Booking, Customer, ServiceRecord, Payment } from '../types';
 
 interface ContactMessage {
@@ -46,12 +46,73 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+// LocalStorage keys
+const STORAGE_KEYS = {
+  BOOKINGS: 'aquapure_bookings',
+  CUSTOMERS: 'aquapure_customers',
+  SERVICE_RECORDS: 'aquapure_service_records',
+  PAYMENTS: 'aquapure_payments',
+  MESSAGES: 'aquapure_messages',
+};
+
+// Helper to load from localStorage
+function loadFromStorage<T>(key: string, defaultValue: T): T {
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : defaultValue;
+  } catch (error) {
+    console.error(`Error loading ${key} from localStorage:`, error);
+    return defaultValue;
+  }
+}
+
+// Helper to save to localStorage
+function saveToStorage<T>(key: string, value: T): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.error(`Error saving ${key} to localStorage:`, error);
+  }
+}
+
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [serviceRecords, setServiceRecords] = useState<ServiceRecord[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [messages, setMessages] = useState<ContactMessage[]>([]);
+  // Initialize state from localStorage
+  const [bookings, setBookings] = useState<Booking[]>(() => 
+    loadFromStorage(STORAGE_KEYS.BOOKINGS, [])
+  );
+  const [customers, setCustomers] = useState<Customer[]>(() => 
+    loadFromStorage(STORAGE_KEYS.CUSTOMERS, [])
+  );
+  const [serviceRecords, setServiceRecords] = useState<ServiceRecord[]>(() => 
+    loadFromStorage(STORAGE_KEYS.SERVICE_RECORDS, [])
+  );
+  const [payments, setPayments] = useState<Payment[]>(() => 
+    loadFromStorage(STORAGE_KEYS.PAYMENTS, [])
+  );
+  const [messages, setMessages] = useState<ContactMessage[]>(() => 
+    loadFromStorage(STORAGE_KEYS.MESSAGES, [])
+  );
+
+  // Persist to localStorage whenever state changes
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.BOOKINGS, bookings);
+  }, [bookings]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.CUSTOMERS, customers);
+  }, [customers]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.SERVICE_RECORDS, serviceRecords);
+  }, [serviceRecords]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.PAYMENTS, payments);
+  }, [payments]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.MESSAGES, messages);
+  }, [messages]);
 
   // Booking operations
   const addBooking = (bookingData: Omit<Booking, 'id' | 'createdAt' | 'status' | 'finalPrice'>): Booking => {
