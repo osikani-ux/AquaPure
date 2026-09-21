@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, CalendarCheck, Users, Wrench, DollarSign, BarChart3, Settings, LogOut, Droplets, Search, Filter, Eye, Edit, CheckCircle2, XCircle, Clock, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
+import { LayoutDashboard, CalendarCheck, Users, Wrench, DollarSign, BarChart3, Settings, LogOut, Droplets, Search, Filter, Eye, Edit, CheckCircle2, XCircle, Clock, AlertTriangle, TrendingUp, TrendingDown, MessageSquare, Trash2 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { mockBookings, mockCustomers, revenueData, serviceDistribution } from '../../data/mockData';
+import { revenueData, serviceDistribution } from '../../data/mockData';
 import { Booking, Customer } from '../../types';
 import { formatGHS, APP_CONFIG } from '../../config';
+import { useData } from '../../context/DataContext';
 
 // Helper function to get date ranges
 const getDateRange = (period: string) => {
@@ -31,12 +32,17 @@ const getDateRange = (period: string) => {
   }
 };
 
-type AdminPage = 'dashboard' | 'bookings' | 'customers' | 'services' | 'pricing' | 'reports' | 'settings';
+type AdminPage = 'dashboard' | 'bookings' | 'customers' | 'services' | 'pricing' | 'reports' | 'messages' | 'settings';
 
 export default function AdminDashboard() {
+  const { 
+    bookings, addBooking, updateBooking, 
+    customers, 
+    messages, markMessageRead, deleteMessage 
+  } = useData();
+  
   const [activePage, setActivePage] = useState<AdminPage>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [bookings, setBookings] = useState<Booking[]>(mockBookings);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -131,7 +137,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const path = location.pathname.split('/').pop();
-    if (path && ['dashboard', 'bookings', 'customers', 'services', 'pricing', 'reports', 'settings'].includes(path)) {
+    if (path && ['dashboard', 'bookings', 'customers', 'messages', 'services', 'pricing', 'reports', 'settings'].includes(path)) {
       setActivePage(path as AdminPage);
     }
   }, [location]);
@@ -142,7 +148,7 @@ export default function AdminDashboard() {
   };
 
   const updateBookingStatus = (id: string, status: Booking['status']) => {
-    setBookings(prev => prev.map(b => b.id === id ? { ...b, status } : b));
+    updateBooking(id, { status });
     if (selectedBooking?.id === id) {
       setSelectedBooking(prev => prev ? { ...prev, status } : null);
     }
@@ -153,8 +159,7 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!selectedCustomer) return;
     
-    const newBooking: Booking = {
-      id: String(Date.now()),
+    addBooking({
       customerId: selectedCustomer.id,
       customerName: selectedCustomer.name,
       customerPhone: selectedCustomer.phone,
@@ -164,16 +169,11 @@ export default function AdminDashboard() {
       propertyType: 'Home',
       preferredDate: scheduleForm.preferredDate,
       preferredTime: scheduleForm.preferredTime,
-      status: 'pending',
       estimatedPrice: 250,
-      finalPrice: null,
       notes: scheduleForm.notes,
       address: selectedCustomer.address,
       location: selectedCustomer.location,
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-    
-    setBookings(prev => [newBooking, ...prev]);
+    });
     setScheduleSuccess(true);
     
     // Reset form after 2 seconds
@@ -331,7 +331,7 @@ export default function AdminDashboard() {
     confirmed: bookings.filter(b => b.status === 'confirmed').length,
     completed: bookings.filter(b => b.status === 'completed').length,
     monthlyRevenue: 4800,
-    totalCustomers: mockCustomers.length,
+    totalCustomers: customers.length,
   };
 
   const statusColors: Record<string, string> = {
@@ -344,10 +344,13 @@ export default function AdminDashboard() {
 
   const COLORS = ['#00b3ac', '#06b6d4', '#22c55e', '#f59e0b'];
 
+  const unreadMessages = messages.filter(m => !m.read).length;
+  
   const navItems = [
     { id: 'dashboard' as AdminPage, icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'bookings' as AdminPage, icon: CalendarCheck, label: 'Bookings' },
     { id: 'customers' as AdminPage, icon: Users, label: 'Customers' },
+    { id: 'messages' as AdminPage, icon: MessageSquare, label: 'Messages', badge: unreadMessages },
     { id: 'services' as AdminPage, icon: Wrench, label: 'Services' },
     { id: 'pricing' as AdminPage, icon: DollarSign, label: 'Pricing' },
     { id: 'reports' as AdminPage, icon: BarChart3, label: 'Reports' },
@@ -376,14 +379,19 @@ export default function AdminDashboard() {
               <button
                 key={item.id}
                 onClick={() => { setActivePage(item.id); setSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                   activePage === item.id
                     ? 'bg-aqua-500/10 text-aqua-400'
                     : 'text-navy-300 hover:text-white hover:bg-white/5'
                 }`}
               >
-                <item.icon className="w-5 h-5" />
-                {item.label}
+                <div className="flex items-center gap-3">
+                  <item.icon className="w-5 h-5" />
+                  {item.label}
+                </div>
+                {'badge' in item && item.badge && item.badge > 0 ? (
+                  <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-xs font-bold">{item.badge}</span>
+                ) : null}
               </button>
             ))}
           </nav>
@@ -658,6 +666,51 @@ export default function AdminDashboard() {
                           ))}
                         </div>
                       </div>
+
+                      {/* Final Price */}
+                      <div>
+                        <p className="text-xs text-navy-500 mb-2">Set Final Price</p>
+                        <div className="flex gap-2">
+                          <input 
+                            type="number" 
+                            min="0"
+                            placeholder="Enter final price"
+                            defaultValue={selectedBooking.finalPrice || ''}
+                            className="flex-1 px-3 py-2 rounded-lg border border-navy-200 text-sm text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none"
+                            onBlur={(e) => {
+                              const val = parseInt(e.target.value);
+                              if (!isNaN(val) && val >= 0) {
+                                updateBooking(selectedBooking.id, { finalPrice: val });
+                                setSelectedBooking(prev => prev ? { ...prev, finalPrice: val } : null);
+                              }
+                            }}
+                          />
+                          <span className="flex items-center text-sm text-navy-500">GH₵</span>
+                        </div>
+                      </div>
+
+                      {/* Notes */}
+                      <div>
+                        <p className="text-xs text-navy-500 mb-2">Admin Notes</p>
+                        <textarea 
+                          rows={2}
+                          defaultValue={selectedBooking.notes}
+                          placeholder="Add notes about this booking..."
+                          className="w-full px-3 py-2 rounded-lg border border-navy-200 text-sm text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none resize-none"
+                          onBlur={(e) => {
+                            updateBooking(selectedBooking.id, { notes: e.target.value });
+                            setSelectedBooking(prev => prev ? { ...prev, notes: e.target.value } : null);
+                          }}
+                        />
+                      </div>
+
+                      {/* Booking Notes from Customer */}
+                      {selectedBooking.notes && selectedBooking.notes.length > 0 && (
+                        <div className="p-3 rounded-lg bg-amber-50 border border-amber-100">
+                          <p className="text-xs text-amber-700 font-medium mb-1">Customer Notes</p>
+                          <p className="text-sm text-amber-800">{selectedBooking.notes}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -690,14 +743,14 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {mockCustomers
-                        .filter(customer => 
+                      {customers
+                        .filter((customer: Customer) => 
                           customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           customer.phone.includes(searchTerm) ||
                           customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           customer.location.toLowerCase().includes(searchTerm.toLowerCase())
                         )
-                        .map(customer => (
+                        .map((customer: Customer) => (
                         <tr key={customer.id} className="border-t border-navy-100 hover:bg-navy-50/50">
                           <td className="px-4 py-3">
                             <p className="text-sm font-semibold text-navy-800">{customer.name}</p>
@@ -1774,6 +1827,73 @@ export default function AdminDashboard() {
                   </>
                 );
               })()}
+            </div>
+          )}
+
+          {activePage === 'messages' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-xl border border-navy-100 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-navy-100">
+                  <h2 className="text-lg font-bold text-navy-900">Contact Messages</h2>
+                  <p className="text-sm text-navy-500 mt-1">Messages from the contact form</p>
+                </div>
+                <div className="divide-y divide-navy-100">
+                  {messages.length === 0 ? (
+                    <div className="p-12 text-center">
+                      <MessageSquare className="w-12 h-12 text-navy-300 mx-auto mb-3" />
+                      <p className="text-navy-500">No messages yet</p>
+                    </div>
+                  ) : (
+                    messages.map(message => (
+                      <div key={message.id} className={`p-6 ${!message.read ? 'bg-aqua-50/30' : ''}`}>
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-aqua-500 to-cyan-500 flex items-center justify-center text-white font-bold text-sm">
+                              {message.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-navy-900">{message.name}</p>
+                              <p className="text-xs text-navy-500">{message.createdAt}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {!message.read && (
+                              <span className="px-2 py-0.5 rounded-full bg-aqua-100 text-aqua-700 text-xs font-medium">New</span>
+                            )}
+                            <button 
+                              onClick={() => markMessageRead(message.id)}
+                              className="p-1.5 rounded-lg hover:bg-navy-100 transition-colors"
+                              title="Mark as read"
+                            >
+                              <CheckCircle2 className="w-4 h-4 text-navy-400" />
+                            </button>
+                            <button 
+                              onClick={() => deleteMessage(message.id)}
+                              className="p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-400" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="ml-13 space-y-2">
+                          <div className="flex flex-wrap gap-4 text-sm">
+                            <span className="text-navy-600">
+                              <span className="font-medium">Phone:</span> {message.phone}
+                            </span>
+                            {message.email && (
+                              <span className="text-navy-600">
+                                <span className="font-medium">Email:</span> {message.email}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-navy-800 bg-navy-50/50 p-3 rounded-lg">{message.message}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           )}
 

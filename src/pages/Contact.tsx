@@ -1,13 +1,21 @@
 import { useState } from 'react';
 import { Phone, Mail, MapPin, Clock, Send, CheckCircle2 } from 'lucide-react';
 import { APP_CONFIG, getWhatsAppLink } from '../config';
+import { useData } from '../context/DataContext';
 
 export default function ContactPage() {
+  const { addMessage } = useData();
   const [submitted, setSubmitted] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', email: '', message: '' });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    addMessage({
+      name: form.name,
+      phone: form.phone,
+      email: form.email,
+      message: form.message,
+    });
     setSubmitted(true);
   };
 

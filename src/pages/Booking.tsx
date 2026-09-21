@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { CheckCircle2, Upload, CalendarCheck } from 'lucide-react';
+import { useData } from '../context/DataContext';
 
 export default function BookingPage() {
+  const { addBooking, addCustomer } = useData();
   const [submitted, setSubmitted] = useState(false);
+  const [bookingId, setBookingId] = useState('');
   const [form, setForm] = useState({
     fullName: '', phone: '', whatsapp: '', email: '', address: '', location: '',
     serviceType: '', tankSize: '', numberOfTanks: '1', propertyType: '',
@@ -15,6 +18,35 @@ export default function BookingPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Create or get customer
+    const customer = addCustomer({
+      name: form.fullName,
+      phone: form.phone,
+      whatsapp: form.whatsapp || form.phone,
+      email: form.email,
+      address: form.address,
+      location: form.location,
+    });
+
+    // Create booking
+    const booking = addBooking({
+      customerId: customer.id,
+      customerName: form.fullName,
+      customerPhone: form.phone,
+      serviceType: form.serviceType,
+      tankSize: form.tankSize,
+      numberOfTanks: parseInt(form.numberOfTanks) || 1,
+      propertyType: form.propertyType,
+      preferredDate: form.preferredDate,
+      preferredTime: form.preferredTime,
+      estimatedPrice: 250, // Default estimate
+      notes: form.notes,
+      address: form.address,
+      location: form.location,
+    });
+
+    setBookingId(booking.id);
     setSubmitted(true);
   };
 

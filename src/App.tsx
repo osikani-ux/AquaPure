@@ -28,6 +28,7 @@ function App() {
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/bookings" element={<AdminDashboard />} />
         <Route path="/admin/customers" element={<AdminDashboard />} />
+        <Route path="/admin/messages" element={<AdminDashboard />} />
         <Route path="/admin/services" element={<AdminDashboard />} />
         <Route path="/admin/pricing" element={<AdminDashboard />} />
         <Route path="/admin/reports" element={<AdminDashboard />} />
