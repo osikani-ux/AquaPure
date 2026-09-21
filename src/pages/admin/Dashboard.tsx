@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { LayoutDashboard, CalendarCheck, Users, Wrench, DollarSign, BarChart3, Settings, LogOut, Droplets, Search, Filter, Eye, Edit, CheckCircle2, XCircle, Clock, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { mockBookings, mockCustomers, revenueData, serviceDistribution } from '../../data/mockData';
-import { Booking } from '../../types';
+import { Booking, Customer } from '../../types';
 import { formatGHS, APP_CONFIG } from '../../config';
 
 // Helper function to get date ranges
@@ -38,6 +38,7 @@ export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [bookings, setBookings] = useState<Booking[]>(mockBookings);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [reportPeriod, setReportPeriod] = useState('month'); // Default to month
@@ -419,7 +420,13 @@ export default function AdminDashboard() {
             <div className="space-y-6">
               <div className="relative max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-navy-400" />
-                <input type="text" placeholder="Search customers..." className="w-full pl-11 pr-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none" />
+                <input 
+                  type="text" 
+                  placeholder="Search customers..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none" 
+                />
               </div>
               <div className="bg-white rounded-xl border border-navy-100 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
@@ -434,7 +441,14 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {mockCustomers.map(customer => (
+                      {mockCustomers
+                        .filter(customer => 
+                          customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          customer.phone.includes(searchTerm) ||
+                          customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          customer.location.toLowerCase().includes(searchTerm.toLowerCase())
+                        )
+                        .map(customer => (
                         <tr key={customer.id} className="border-t border-navy-100 hover:bg-navy-50/50">
                           <td className="px-4 py-3">
                             <p className="text-sm font-semibold text-navy-800">{customer.name}</p>
@@ -446,7 +460,10 @@ export default function AdminDashboard() {
                             {bookings.find(b => b.customerId === customer.id && b.status === 'completed')?.preferredDate || '—'}
                           </td>
                           <td className="px-4 py-3 text-right">
-                            <button className="p-2 rounded-lg hover:bg-navy-100 transition-colors">
+                            <button 
+                              onClick={() => setSelectedCustomer(customer)}
+                              className="p-2 rounded-lg hover:bg-navy-100 transition-colors"
+                            >
                               <Eye className="w-4 h-4 text-navy-600" />
                             </button>
                           </td>
@@ -456,6 +473,131 @@ export default function AdminDashboard() {
                   </table>
                 </div>
               </div>
+
+              {/* Customer Detail Modal */}
+              {selectedCustomer && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelectedCustomer(null)}>
+                  <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="p-6 border-b border-navy-100">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-navy-900">Customer Details</h3>
+                        <button onClick={() => setSelectedCustomer(null)} className="p-2 rounded-lg hover:bg-navy-50">
+                          <XCircle className="w-5 h-5 text-navy-400" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-6 space-y-6">
+                      {/* Customer Information */}
+                      <div>
+                        <h4 className="text-sm font-semibold text-navy-700 mb-3">Customer Information</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs text-navy-500">Name</p>
+                            <p className="font-semibold text-navy-800">{selectedCustomer.name}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-navy-500">Phone</p>
+                            <p className="font-semibold text-navy-800">{selectedCustomer.phone}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-navy-500">WhatsApp</p>
+                            <p className="font-semibold text-navy-800">{selectedCustomer.whatsapp}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-navy-500">Email</p>
+                            <p className="font-semibold text-navy-800">{selectedCustomer.email}</p>
+                          </div>
+                          <div className="sm:col-span-2">
+                            <p className="text-xs text-navy-500">Address</p>
+                            <p className="font-semibold text-navy-800">{selectedCustomer.address}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-navy-500">Location</p>
+                            <p className="font-semibold text-navy-800">{selectedCustomer.location}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-navy-500">Customer Since</p>
+                            <p className="font-semibold text-navy-800">{selectedCustomer.createdAt}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tank Information */}
+                      <div>
+                        <h4 className="text-sm font-semibold text-navy-700 mb-3">Tank Information</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-lg bg-navy-50/50">
+                          <div>
+                            <p className="text-xs text-navy-500">Tank Capacity</p>
+                            <p className="font-semibold text-navy-800">2,000 Litres</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-navy-500">Number of Tanks</p>
+                            <p className="font-semibold text-navy-800">1</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-navy-500">Tank Type</p>
+                            <p className="font-semibold text-navy-800">Plastic</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-navy-500">Condition</p>
+                            <p className="font-semibold text-navy-800">Good</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-navy-500">Last Cleaning</p>
+                            <p className="font-semibold text-navy-800">
+                              {bookings.find(b => b.customerId === selectedCustomer.id && b.status === 'completed')?.preferredDate || 'Not yet serviced'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-navy-500">Next Recommended Service</p>
+                            <p className="font-semibold text-aqua-600">2025-07-20</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Service History */}
+                      <div>
+                        <h4 className="text-sm font-semibold text-navy-700 mb-3">Service History</h4>
+                        <div className="space-y-3">
+                          {bookings.filter(b => b.customerId === selectedCustomer.id).length > 0 ? (
+                            bookings.filter(b => b.customerId === selectedCustomer.id).map(booking => (
+                              <div key={booking.id} className="p-4 rounded-lg bg-navy-50/50 border border-navy-100">
+                                <div className="flex items-start justify-between mb-2">
+                                  <div>
+                                    <p className="font-semibold text-navy-800">{booking.serviceType}</p>
+                                    <p className="text-xs text-navy-500">{booking.preferredDate} at {booking.preferredTime}</p>
+                                  </div>
+                                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[booking.status]}`}>
+                                    {booking.status}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-navy-600">{booking.numberOfTanks} tank(s) - {booking.tankSize}</span>
+                                  <span className="font-bold text-navy-900">
+                                    {booking.finalPrice ? formatGHS(booking.finalPrice) : formatGHS(booking.estimatedPrice)}
+                                  </span>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm text-navy-500 text-center py-4">No service history available</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-3 pt-4 border-t border-navy-100">
+                        <button className="flex-1 py-3 bg-gradient-to-r from-aqua-600 to-cyan-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
+                          Schedule Service
+                        </button>
+                        <button className="flex-1 py-3 border-2 border-navy-200 text-navy-800 rounded-xl font-semibold hover:bg-navy-50 transition-colors">
+                          Add Note
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
