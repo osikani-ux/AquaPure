@@ -6,6 +6,31 @@ import { mockBookings, mockCustomers, revenueData, serviceDistribution } from '.
 import { Booking } from '../../types';
 import { formatGHS, APP_CONFIG } from '../../config';
 
+// Helper function to get date ranges
+const getDateRange = (period: string) => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  switch (period) {
+    case 'today':
+      return { start: today, end: new Date(today.getTime() + 24 * 60 * 60 * 1000 - 1) };
+    case 'week':
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - today.getDay());
+      return { start: weekStart, end: new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000 - 1) };
+    case 'month':
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      return { start: monthStart, end: monthEnd };
+    case 'year':
+      const yearStart = new Date(now.getFullYear(), 0, 1);
+      const yearEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+      return { start: yearStart, end: yearEnd };
+    default:
+      return { start: today, end: new Date(today.getTime() + 24 * 60 * 60 * 1000 - 1) };
+  }
+};
+
 type AdminPage = 'dashboard' | 'bookings' | 'customers' | 'services' | 'pricing' | 'reports' | 'settings';
 
 export default function AdminDashboard() {
@@ -15,6 +40,7 @@ export default function AdminDashboard() {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [reportPeriod, setReportPeriod] = useState('month'); // Default to month
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -523,49 +549,225 @@ export default function AdminDashboard() {
 
           {activePage === 'reports' && (
             <div className="space-y-6">
+              {/* Period Selector */}
               <div className="flex flex-wrap gap-3">
-                {['Today', 'This Week', 'This Month', 'This Year'].map((period, i) => (
-                  <button key={i} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${i === 2 ? 'bg-aqua-500 text-white' : 'bg-white border border-navy-200 text-navy-700 hover:bg-navy-50'}`}>
-                    {period}
+                {[
+                  { key: 'today', label: 'Today' },
+                  { key: 'week', label: 'This Week' },
+                  { key: 'month', label: 'This Month' },
+                  { key: 'year', label: 'This Year' }
+                ].map((period) => (
+                  <button 
+                    key={period.key}
+                    onClick={() => setReportPeriod(period.key)}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                      reportPeriod === period.key 
+                        ? 'bg-aqua-500 text-white shadow-lg shadow-aqua-500/25' 
+                        : 'bg-white border border-navy-200 text-navy-700 hover:bg-navy-50'
+                    }`}
+                  >
+                    {period.label}
                   </button>
                 ))}
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-xl border border-navy-100 p-6 shadow-sm">
-                  <h3 className="font-bold text-navy-900 mb-4">Revenue Trend</h3>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <LineChart data={revenueData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="month" stroke="#627d98" fontSize={12} />
-                      <YAxis stroke="#627d98" fontSize={12} />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="revenue" stroke="#00b3ac" strokeWidth={3} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="bg-white rounded-xl border border-navy-100 p-6 shadow-sm">
-                  <h3 className="font-bold text-navy-900 mb-4">Bookings Summary</h3>
-                  <div className="space-y-4">
-                    {[
-                      { label: 'Total Bookings', value: '67', change: '+12%', up: true },
-                      { label: 'Completed', value: '48', change: '+8%', up: true },
-                      { label: 'Cancelled', value: '5', change: '-2%', up: false },
-                      { label: 'Repeat Customers', value: '23', change: '+15%', up: true },
-                    ].map((item, i) => (
-                      <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-navy-50/50">
-                        <span className="text-sm font-medium text-navy-700">{item.label}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold text-navy-900">{item.value}</span>
-                          <span className={`flex items-center text-xs font-medium ${item.up ? 'text-green-600' : 'text-red-600'}`}>
-                            {item.up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                            {item.change}
-                          </span>
+
+              {/* Reports Content */}
+              {(() => {
+                const dateRange = getDateRange(reportPeriod);
+                const filteredBookings = bookings.filter(b => {
+                  const bookingDate = new Date(b.createdAt);
+                  return bookingDate >= dateRange.start && bookingDate <= dateRange.end;
+                });
+
+                const totalBookings = filteredBookings.length;
+                const completedBookings = filteredBookings.filter(b => b.status === 'completed').length;
+                const cancelledBookings = filteredBookings.filter(b => b.status === 'cancelled').length;
+                const totalRevenue = filteredBookings
+                  .filter(b => b.status === 'completed' && b.finalPrice)
+                  .reduce((sum, b) => sum + (b.finalPrice || 0), 0);
+                
+                // Calculate repeat customers (customers with more than 1 booking)
+                const customerBookingCounts = filteredBookings.reduce((acc, b) => {
+                  acc[b.customerId] = (acc[b.customerId] || 0) + 1;
+                  return acc;
+                }, {} as Record<string, number>);
+                const repeatCustomers = Object.values(customerBookingCounts).filter(count => count > 1).length;
+
+                // Generate chart data based on period
+                const generateChartData = () => {
+                  if (reportPeriod === 'today') {
+                    return [
+                      { time: '6AM', bookings: 0, revenue: 0 },
+                      { time: '9AM', bookings: 1, revenue: 150 },
+                      { time: '12PM', bookings: 2, revenue: 400 },
+                      { time: '3PM', bookings: 1, revenue: 250 },
+                      { time: '6PM', bookings: 0, revenue: 0 },
+                    ];
+                  } else if (reportPeriod === 'week') {
+                    return [
+                      { time: 'Mon', bookings: 3, revenue: 650 },
+                      { time: 'Tue', bookings: 2, revenue: 400 },
+                      { time: 'Wed', bookings: 4, revenue: 900 },
+                      { time: 'Thu', bookings: 1, revenue: 200 },
+                      { time: 'Fri', bookings: 3, revenue: 750 },
+                      { time: 'Sat', bookings: 2, revenue: 500 },
+                      { time: 'Sun', bookings: 0, revenue: 0 },
+                    ];
+                  } else if (reportPeriod === 'month') {
+                    return [
+                      { time: 'Week 1', bookings: 12, revenue: 2800 },
+                      { time: 'Week 2', bookings: 15, revenue: 3600 },
+                      { time: 'Week 3', bookings: 18, revenue: 4200 },
+                      { time: 'Week 4', bookings: 14, revenue: 3400 },
+                    ];
+                  } else {
+                    return [
+                      { time: 'Jan', bookings: 16, revenue: 4800 },
+                      { time: 'Feb', bookings: 14, revenue: 4200 },
+                      { time: 'Mar', bookings: 18, revenue: 5400 },
+                      { time: 'Apr', bookings: 12, revenue: 3600 },
+                      { time: 'May', bookings: 20, revenue: 6000 },
+                      { time: 'Jun', bookings: 15, revenue: 4500 },
+                      { time: 'Jul', bookings: 17, revenue: 5100 },
+                      { time: 'Aug', bookings: 19, revenue: 5700 },
+                      { time: 'Sep', bookings: 13, revenue: 3900 },
+                      { time: 'Oct', bookings: 16, revenue: 4800 },
+                      { time: 'Nov', bookings: 14, revenue: 4200 },
+                      { time: 'Dec', bookings: 11, revenue: 3300 },
+                    ];
+                  }
+                };
+
+                const chartData = generateChartData();
+
+                // Calculate percentage changes (mock data for demonstration)
+                const getChange = (metric: string) => {
+                  const changes: Record<string, Record<string, { value: string; up: boolean }>> = {
+                    today: { bookings: { value: '+5%', up: true }, completed: { value: '+3%', up: true }, cancelled: { value: '-1%', up: false }, revenue: { value: '+8%', up: true }, repeat: { value: '+2%', up: true } },
+                    week: { bookings: { value: '+12%', up: true }, completed: { value: '+8%', up: true }, cancelled: { value: '-2%', up: false }, revenue: { value: '+15%', up: true }, repeat: { value: '+5%', up: true } },
+                    month: { bookings: { value: '+18%', up: true }, completed: { value: '+12%', up: true }, cancelled: { value: '-3%', up: false }, revenue: { value: '+22%', up: true }, repeat: { value: '+10%', up: true } },
+                    year: { bookings: { value: '+25%', up: true }, completed: { value: '+20%', up: true }, cancelled: { value: '-5%', up: false }, revenue: { value: '+30%', up: true }, repeat: { value: '+15%', up: true } },
+                  };
+                  return changes[reportPeriod]?.[metric] || { value: '0%', up: true };
+                };
+
+                return (
+                  <>
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="bg-white rounded-xl border border-navy-100 p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-navy-600">Total Bookings</span>
+                          <CalendarCheck className="w-5 h-5 text-aqua-500" />
+                        </div>
+                        <p className="text-3xl font-bold text-navy-900">{totalBookings}</p>
+                        <div className="flex items-center gap-1 mt-2">
+                          <TrendingUp className="w-3 h-3 text-green-600" />
+                          <span className="text-xs font-medium text-green-600">{getChange('bookings').value}</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+                      <div className="bg-white rounded-xl border border-navy-100 p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-navy-600">Completed</span>
+                          <CheckCircle2 className="w-5 h-5 text-green-500" />
+                        </div>
+                        <p className="text-3xl font-bold text-navy-900">{completedBookings}</p>
+                        <div className="flex items-center gap-1 mt-2">
+                          <TrendingUp className="w-3 h-3 text-green-600" />
+                          <span className="text-xs font-medium text-green-600">{getChange('completed').value}</span>
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-xl border border-navy-100 p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-navy-600">Cancelled</span>
+                          <XCircle className="w-5 h-5 text-red-500" />
+                        </div>
+                        <p className="text-3xl font-bold text-navy-900">{cancelledBookings}</p>
+                        <div className="flex items-center gap-1 mt-2">
+                          <TrendingDown className="w-3 h-3 text-red-600" />
+                          <span className="text-xs font-medium text-red-600">{getChange('cancelled').value}</span>
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-xl border border-navy-100 p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-navy-600">Revenue</span>
+                          <DollarSign className="w-5 h-5 text-aqua-500" />
+                        </div>
+                        <p className="text-2xl font-bold text-navy-900">{formatGHS(totalRevenue)}</p>
+                        <div className="flex items-center gap-1 mt-2">
+                          <TrendingUp className="w-3 h-3 text-green-600" />
+                          <span className="text-xs font-medium text-green-600">{getChange('revenue').value}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Charts */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="bg-white rounded-xl border border-navy-100 p-6 shadow-sm">
+                        <h3 className="font-bold text-navy-900 mb-4">Revenue Trend</h3>
+                        <ResponsiveContainer width="100%" height={250}>
+                          <LineChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                            <XAxis dataKey="time" stroke="#627d98" fontSize={12} />
+                            <YAxis stroke="#627d98" fontSize={12} />
+                            <Tooltip />
+                            <Line type="monotone" dataKey="revenue" stroke="#00b3ac" strokeWidth={3} dot={{ fill: '#00b3ac', r: 4 }} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="bg-white rounded-xl border border-navy-100 p-6 shadow-sm">
+                        <h3 className="font-bold text-navy-900 mb-4">Bookings Over Time</h3>
+                        <ResponsiveContainer width="100%" height={250}>
+                          <BarChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                            <XAxis dataKey="time" stroke="#627d98" fontSize={12} />
+                            <YAxis stroke="#627d98" fontSize={12} />
+                            <Tooltip />
+                            <Bar dataKey="bookings" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    {/* Detailed Summary */}
+                    <div className="bg-white rounded-xl border border-navy-100 p-6 shadow-sm">
+                      <h3 className="font-bold text-navy-900 mb-4">Detailed Summary</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between p-3 rounded-lg bg-navy-50/50">
+                            <span className="text-sm font-medium text-navy-700">Total Bookings</span>
+                            <span className="text-lg font-bold text-navy-900">{totalBookings}</span>
+                          </div>
+                          <div className="flex items-center justify-between p-3 rounded-lg bg-navy-50/50">
+                            <span className="text-sm font-medium text-navy-700">Completed Services</span>
+                            <span className="text-lg font-bold text-green-700">{completedBookings}</span>
+                          </div>
+                          <div className="flex items-center justify-between p-3 rounded-lg bg-navy-50/50">
+                            <span className="text-sm font-medium text-navy-700">Cancelled Bookings</span>
+                            <span className="text-lg font-bold text-red-700">{cancelledBookings}</span>
+                          </div>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between p-3 rounded-lg bg-navy-50/50">
+                            <span className="text-sm font-medium text-navy-700">Total Revenue</span>
+                            <span className="text-lg font-bold text-aqua-600">{formatGHS(totalRevenue)}</span>
+                          </div>
+                          <div className="flex items-center justify-between p-3 rounded-lg bg-navy-50/50">
+                            <span className="text-sm font-medium text-navy-700">Repeat Customers</span>
+                            <span className="text-lg font-bold text-navy-900">{repeatCustomers}</span>
+                          </div>
+                          <div className="flex items-center justify-between p-3 rounded-lg bg-navy-50/50">
+                            <span className="text-sm font-medium text-navy-700">Completion Rate</span>
+                            <span className="text-lg font-bold text-navy-900">
+                              {totalBookings > 0 ? Math.round((completedBookings / totalBookings) * 100) : 0}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           )}
 
