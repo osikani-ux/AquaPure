@@ -82,6 +82,44 @@ export default function AdminDashboard() {
     active: true
   });
   const [serviceEditSuccess, setServiceEditSuccess] = useState(false);
+
+  // Pricing state
+  const [tankSizePricing, setTankSizePricing] = useState([
+    { id: 'ts1', range: '500–1,000 Litres', price: 150, active: true },
+    { id: 'ts2', range: '1,500–2,000 Litres', price: 200, active: true },
+    { id: 'ts3', range: '2,500–5,000 Litres', price: 300, active: true },
+    { id: 'ts4', range: '5,000–10,000 Litres', price: 500, active: true },
+    { id: 'ts5', range: '10,000 Litres+', price: 0, active: true },
+  ]);
+  const [multiTankDiscounts, setMultiTankDiscounts] = useState([
+    { id: 'mt1', tanks: '2 Tanks', discount: 5, active: true },
+    { id: 'mt2', tanks: '3–5 Tanks', discount: 10, active: true },
+    { id: 'mt3', tanks: '6+ Tanks', discount: 15, active: true },
+  ]);
+  const [additionalCharges, setAdditionalCharges] = useState([
+    { id: 'ac1', item: 'Heavy sediment/buildup', charge: 50, active: true },
+    { id: 'ac2', item: 'Difficult tank access', charge: 50, active: true },
+    { id: 'ac3', item: 'High-level/rooftop access', charge: 50, active: true },
+  ]);
+
+  // Pricing edit modal state
+  type PricingCategory = 'tankSize' | 'multiTank' | 'additionalCharge';
+  const [pricingModal, setPricingModal] = useState<{
+    open: boolean;
+    category: PricingCategory | null;
+    mode: 'edit' | 'add';
+    itemId: string | null;
+  }>({ open: false, category: null, mode: 'edit', itemId: null });
+  const [pricingForm, setPricingForm] = useState<{
+    range: string;
+    price: number;
+    tanks: string;
+    discount: number;
+    item: string;
+    charge: number;
+    active: boolean;
+  }>({ range: '', price: 0, tanks: '', discount: 0, item: '', charge: 0, active: true });
+  const [pricingEditSuccess, setPricingEditSuccess] = useState(false);
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -217,6 +255,67 @@ export default function AdminDashboard() {
         ? { ...s, active: !s.active }
         : s
     ));
+  };
+
+  // Pricing handlers
+  const handleOpenPricingModal = (category: PricingCategory, mode: 'edit' | 'add', itemId?: string) => {
+    setPricingModal({ open: true, category, mode, itemId: itemId || null });
+    
+    if (mode === 'edit' && itemId) {
+      if (category === 'tankSize') {
+        const item = tankSizePricing.find(i => i.id === itemId);
+        if (item) setPricingForm({ ...pricingForm, range: item.range, price: item.price, active: item.active });
+      } else if (category === 'multiTank') {
+        const item = multiTankDiscounts.find(i => i.id === itemId);
+        if (item) setPricingForm({ ...pricingForm, tanks: item.tanks, discount: item.discount, active: item.active });
+      } else if (category === 'additionalCharge') {
+        const item = additionalCharges.find(i => i.id === itemId);
+        if (item) setPricingForm({ ...pricingForm, item: item.item, charge: item.charge, active: item.active });
+      }
+    } else {
+      setPricingForm({ range: '', price: 0, tanks: '', discount: 0, item: '', charge: 0, active: true });
+    }
+  };
+
+  const handleSavePricing = (e: React.FormEvent) => {
+    e.preventDefault();
+    const { category, mode, itemId } = pricingModal;
+
+    if (category === 'tankSize') {
+      if (mode === 'add') {
+        setTankSizePricing(prev => [...prev, { id: `ts${Date.now()}`, range: pricingForm.range, price: pricingForm.price, active: pricingForm.active }]);
+      } else if (itemId) {
+        setTankSizePricing(prev => prev.map(i => i.id === itemId ? { ...i, range: pricingForm.range, price: pricingForm.price, active: pricingForm.active } : i));
+      }
+    } else if (category === 'multiTank') {
+      if (mode === 'add') {
+        setMultiTankDiscounts(prev => [...prev, { id: `mt${Date.now()}`, tanks: pricingForm.tanks, discount: pricingForm.discount, active: pricingForm.active }]);
+      } else if (itemId) {
+        setMultiTankDiscounts(prev => prev.map(i => i.id === itemId ? { ...i, tanks: pricingForm.tanks, discount: pricingForm.discount, active: pricingForm.active } : i));
+      }
+    } else if (category === 'additionalCharge') {
+      if (mode === 'add') {
+        setAdditionalCharges(prev => [...prev, { id: `ac${Date.now()}`, item: pricingForm.item, charge: pricingForm.charge, active: pricingForm.active }]);
+      } else if (itemId) {
+        setAdditionalCharges(prev => prev.map(i => i.id === itemId ? { ...i, item: pricingForm.item, charge: pricingForm.charge, active: pricingForm.active } : i));
+      }
+    }
+
+    setPricingEditSuccess(true);
+    setTimeout(() => {
+      setPricingModal({ open: false, category: null, mode: 'edit', itemId: null });
+      setPricingEditSuccess(false);
+    }, 1500);
+  };
+
+  const handleDeletePricing = (category: PricingCategory, itemId: string) => {
+    if (category === 'tankSize') {
+      setTankSizePricing(prev => prev.filter(i => i.id !== itemId));
+    } else if (category === 'multiTank') {
+      setMultiTankDiscounts(prev => prev.filter(i => i.id !== itemId));
+    } else if (category === 'additionalCharge') {
+      setAdditionalCharges(prev => prev.filter(i => i.id !== itemId));
+    }
   };
 
   const filteredBookings = bookings.filter(b => {
@@ -1172,61 +1271,285 @@ export default function AdminDashboard() {
 
           {activePage === 'pricing' && (
             <div className="space-y-6">
+              {/* Tank Size Pricing */}
               <div className="bg-white rounded-xl border border-navy-100 p-6 shadow-sm">
-                <h3 className="font-bold text-navy-900 mb-4">Tank Size Pricing</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-navy-900">Tank Size Pricing</h3>
+                  <button 
+                    onClick={() => handleOpenPricingModal('tankSize', 'add')}
+                    className="px-3 py-1.5 bg-gradient-to-r from-aqua-600 to-cyan-600 text-white rounded-lg font-semibold text-xs shadow hover:shadow-lg transition-all"
+                  >
+                    + Add New
+                  </button>
+                </div>
                 <div className="space-y-3">
-                  {[
-                    { range: '500–1,000 Litres', price: 150 },
-                    { range: '1,500–2,000 Litres', price: 200 },
-                    { range: '2,500–5,000 Litres', price: 300 },
-                    { range: '5,000–10,000 Litres', price: 500 },
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-navy-50/50">
-                      <span className="text-sm font-medium text-navy-700">{item.range}</span>
+                  {tankSizePricing.map((item) => (
+                    <div key={item.id} className={`flex items-center justify-between p-3 rounded-lg ${item.active ? 'bg-navy-50/50' : 'bg-red-50/50 opacity-60'}`}>
+                      <div className="flex items-center gap-3">
+                        <span className={`text-sm font-medium ${item.active ? 'text-navy-700' : 'text-navy-400'}`}>{item.range}</span>
+                        {!item.active && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Inactive</span>}
+                      </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-navy-900">{formatGHS(item.price)}</span>
-                        <button className="p-1.5 rounded-lg hover:bg-navy-100"><Edit className="w-3.5 h-3.5 text-navy-500" /></button>
+                        <span className={`text-sm font-bold ${item.active ? 'text-navy-900' : 'text-navy-400'}`}>
+                          {item.price > 0 ? formatGHS(item.price) : 'Custom'}
+                        </span>
+                        <button 
+                          onClick={() => handleOpenPricingModal('tankSize', 'edit', item.id)}
+                          className="p-1.5 rounded-lg hover:bg-navy-100"
+                        >
+                          <Edit className="w-3.5 h-3.5 text-navy-500" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeletePricing('tankSize', item.id)}
+                          className="p-1.5 rounded-lg hover:bg-red-50"
+                        >
+                          <XCircle className="w-3.5 h-3.5 text-red-500" />
+                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
+
+              {/* Multi-Tank Discounts */}
               <div className="bg-white rounded-xl border border-navy-100 p-6 shadow-sm">
-                <h3 className="font-bold text-navy-900 mb-4">Multi-Tank Discounts</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-navy-900">Multi-Tank Discounts</h3>
+                  <button 
+                    onClick={() => handleOpenPricingModal('multiTank', 'add')}
+                    className="px-3 py-1.5 bg-gradient-to-r from-aqua-600 to-cyan-600 text-white rounded-lg font-semibold text-xs shadow hover:shadow-lg transition-all"
+                  >
+                    + Add New
+                  </button>
+                </div>
                 <div className="space-y-3">
-                  {[
-                    { tanks: '2 Tanks', discount: '5%' },
-                    { tanks: '3–5 Tanks', discount: '10%' },
-                    { tanks: '6+ Tanks', discount: '15%' },
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-navy-50/50">
-                      <span className="text-sm font-medium text-navy-700">{item.tanks}</span>
+                  {multiTankDiscounts.map((item) => (
+                    <div key={item.id} className={`flex items-center justify-between p-3 rounded-lg ${item.active ? 'bg-navy-50/50' : 'bg-red-50/50 opacity-60'}`}>
+                      <div className="flex items-center gap-3">
+                        <span className={`text-sm font-medium ${item.active ? 'text-navy-700' : 'text-navy-400'}`}>{item.tanks}</span>
+                        {!item.active && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Inactive</span>}
+                      </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-aqua-600">{item.discount}</span>
-                        <button className="p-1.5 rounded-lg hover:bg-navy-100"><Edit className="w-3.5 h-3.5 text-navy-500" /></button>
+                        <span className={`text-sm font-bold ${item.active ? 'text-aqua-600' : 'text-navy-400'}`}>{item.discount}%</span>
+                        <button 
+                          onClick={() => handleOpenPricingModal('multiTank', 'edit', item.id)}
+                          className="p-1.5 rounded-lg hover:bg-navy-100"
+                        >
+                          <Edit className="w-3.5 h-3.5 text-navy-500" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeletePricing('multiTank', item.id)}
+                          className="p-1.5 rounded-lg hover:bg-red-50"
+                        >
+                          <XCircle className="w-3.5 h-3.5 text-red-500" />
+                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
+
+              {/* Additional Charges */}
               <div className="bg-white rounded-xl border border-navy-100 p-6 shadow-sm">
-                <h3 className="font-bold text-navy-900 mb-4">Additional Charges</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-navy-900">Additional Charges</h3>
+                  <button 
+                    onClick={() => handleOpenPricingModal('additionalCharge', 'add')}
+                    className="px-3 py-1.5 bg-gradient-to-r from-aqua-600 to-cyan-600 text-white rounded-lg font-semibold text-xs shadow hover:shadow-lg transition-all"
+                  >
+                    + Add New
+                  </button>
+                </div>
                 <div className="space-y-3">
-                  {[
-                    { item: 'Heavy sediment/buildup', charge: '+GH₵50' },
-                    { item: 'Difficult tank access', charge: '+GH₵50' },
-                    { item: 'High-level/rooftop access', charge: '+GH₵50' },
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-navy-50/50">
-                      <span className="text-sm font-medium text-navy-700">{item.item}</span>
+                  {additionalCharges.map((item) => (
+                    <div key={item.id} className={`flex items-center justify-between p-3 rounded-lg ${item.active ? 'bg-navy-50/50' : 'bg-red-50/50 opacity-60'}`}>
+                      <div className="flex items-center gap-3">
+                        <span className={`text-sm font-medium ${item.active ? 'text-navy-700' : 'text-navy-400'}`}>{item.item}</span>
+                        {!item.active && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Inactive</span>}
+                      </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-navy-900">{item.charge}</span>
-                        <button className="p-1.5 rounded-lg hover:bg-navy-100"><Edit className="w-3.5 h-3.5 text-navy-500" /></button>
+                        <span className={`text-sm font-bold ${item.active ? 'text-navy-900' : 'text-navy-400'}`}>+{formatGHS(item.charge)}</span>
+                        <button 
+                          onClick={() => handleOpenPricingModal('additionalCharge', 'edit', item.id)}
+                          className="p-1.5 rounded-lg hover:bg-navy-100"
+                        >
+                          <Edit className="w-3.5 h-3.5 text-navy-500" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeletePricing('additionalCharge', item.id)}
+                          className="p-1.5 rounded-lg hover:bg-red-50"
+                        >
+                          <XCircle className="w-3.5 h-3.5 text-red-500" />
+                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
+
+              {/* Pricing Edit Modal */}
+              {pricingModal.open && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => !pricingEditSuccess && setPricingModal({ open: false, category: null, mode: 'edit', itemId: null })}>
+                  <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+                    <div className="p-6 border-b border-navy-100">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-bold text-navy-900">
+                            {pricingModal.mode === 'add' ? 'Add New' : 'Edit'}{' '}
+                            {pricingModal.category === 'tankSize' ? 'Tank Size Pricing' : 
+                             pricingModal.category === 'multiTank' ? 'Multi-Tank Discount' : 'Additional Charge'}
+                          </h3>
+                          <p className="text-sm text-navy-500 mt-1">
+                            {pricingModal.mode === 'add' ? 'Create a new pricing item' : 'Update pricing details'}
+                          </p>
+                        </div>
+                        {!pricingEditSuccess && (
+                          <button onClick={() => setPricingModal({ open: false, category: null, mode: 'edit', itemId: null })} className="p-2 rounded-lg hover:bg-navy-50">
+                            <XCircle className="w-5 h-5 text-navy-400" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {pricingEditSuccess ? (
+                      <div className="p-8 text-center">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-clean-50 flex items-center justify-center">
+                          <CheckCircle2 className="w-10 h-10 text-clean-500" />
+                        </div>
+                        <h4 className="text-xl font-bold text-navy-900 mb-2">
+                          {pricingModal.mode === 'add' ? 'Added Successfully!' : 'Updated Successfully!'}
+                        </h4>
+                        <p className="text-navy-600">The pricing has been {pricingModal.mode === 'add' ? 'added' : 'updated'}.</p>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleSavePricing} className="p-6 space-y-4">
+                        {pricingModal.category === 'tankSize' && (
+                          <>
+                            <div>
+                              <label className="block text-sm font-semibold text-navy-700 mb-1.5">Tank Capacity Range *</label>
+                              <input 
+                                type="text"
+                                required
+                                value={pricingForm.range}
+                                onChange={(e) => setPricingForm(prev => ({ ...prev, range: e.target.value }))}
+                                className="w-full px-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none"
+                                placeholder="e.g., 500–1,000 Litres"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-semibold text-navy-700 mb-1.5">Starting Price (GH₵) *</label>
+                              <input 
+                                type="number"
+                                required
+                                min="0"
+                                value={pricingForm.price}
+                                onChange={(e) => setPricingForm(prev => ({ ...prev, price: parseInt(e.target.value) || 0 }))}
+                                className="w-full px-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none"
+                                placeholder="0 for custom pricing"
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {pricingModal.category === 'multiTank' && (
+                          <>
+                            <div>
+                              <label className="block text-sm font-semibold text-navy-700 mb-1.5">Number of Tanks *</label>
+                              <input 
+                                type="text"
+                                required
+                                value={pricingForm.tanks}
+                                onChange={(e) => setPricingForm(prev => ({ ...prev, tanks: e.target.value }))}
+                                className="w-full px-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none"
+                                placeholder="e.g., 2 Tanks, 3–5 Tanks"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-semibold text-navy-700 mb-1.5">Discount Percentage (%) *</label>
+                              <input 
+                                type="number"
+                                required
+                                min="0"
+                                max="100"
+                                value={pricingForm.discount}
+                                onChange={(e) => setPricingForm(prev => ({ ...prev, discount: parseInt(e.target.value) || 0 }))}
+                                className="w-full px-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none"
+                                placeholder="e.g., 5, 10, 15"
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {pricingModal.category === 'additionalCharge' && (
+                          <>
+                            <div>
+                              <label className="block text-sm font-semibold text-navy-700 mb-1.5">Charge Description *</label>
+                              <input 
+                                type="text"
+                                required
+                                value={pricingForm.item}
+                                onChange={(e) => setPricingForm(prev => ({ ...prev, item: e.target.value }))}
+                                className="w-full px-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none"
+                                placeholder="e.g., Heavy sediment/buildup"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-semibold text-navy-700 mb-1.5">Additional Charge (GH₵) *</label>
+                              <input 
+                                type="number"
+                                required
+                                min="0"
+                                value={pricingForm.charge}
+                                onChange={(e) => setPricingForm(prev => ({ ...prev, charge: parseInt(e.target.value) || 0 }))}
+                                className="w-full px-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none"
+                                placeholder="e.g., 50"
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-navy-50/50 border border-navy-100">
+                          <div>
+                            <p className="font-semibold text-navy-800">Status</p>
+                            <p className="text-xs text-navy-500 mt-0.5">
+                              {pricingForm.active ? 'Visible to customers' : 'Hidden from customers'}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setPricingForm(prev => ({ ...prev, active: !prev.active }))}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                              pricingForm.active ? 'bg-green-500' : 'bg-navy-300'
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                pricingForm.active ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                        
+                        <div className="flex gap-3 pt-2">
+                          <button 
+                            type="button"
+                            onClick={() => setPricingModal({ open: false, category: null, mode: 'edit', itemId: null })}
+                            className="flex-1 py-3 border-2 border-navy-200 text-navy-800 rounded-xl font-semibold hover:bg-navy-50 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button 
+                            type="submit"
+                            className="flex-1 py-3 bg-gradient-to-r from-aqua-600 to-cyan-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all"
+                          >
+                            {pricingModal.mode === 'add' ? 'Add' : 'Save Changes'}
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
