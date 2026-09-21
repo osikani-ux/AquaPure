@@ -4,7 +4,7 @@ import { LayoutDashboard, CalendarCheck, Users, Wrench, DollarSign, BarChart3, S
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { revenueData, serviceDistribution } from '../../data/mockData';
 import { Booking, Customer } from '../../types';
-import { formatGHS, APP_CONFIG } from '../../config';
+import { formatGHS, APP_CONFIG, ADMIN_EMAIL } from '../../config';
 import { useData } from '../../context/DataContext';
 
 // Helper function to get date ranges
@@ -325,12 +325,15 @@ export default function AdminDashboard() {
     return matchesSearch && matchesStatus;
   });
 
+  const today = new Date().toISOString().split('T')[0];
   const stats = {
-    todayBookings: bookings.filter(b => b.preferredDate === '2025-01-25').length,
+    todayBookings: bookings.filter(b => b.preferredDate === today).length,
     pending: bookings.filter(b => b.status === 'pending').length,
     confirmed: bookings.filter(b => b.status === 'confirmed').length,
     completed: bookings.filter(b => b.status === 'completed').length,
-    monthlyRevenue: 4800,
+    monthlyRevenue: bookings
+      .filter(b => b.status === 'completed' && b.finalPrice)
+      .reduce((sum, b) => sum + (b.finalPrice || 0), 0),
     totalCustomers: customers.length,
   };
 
@@ -425,7 +428,7 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-3">
             <div className="hidden sm:block text-right">
               <p className="text-sm font-semibold text-navy-800">Admin</p>
-              <p className="text-xs text-navy-500">{APP_CONFIG.adminCredentials.email}</p>
+              <p className="text-xs text-navy-500">{ADMIN_EMAIL}</p>
             </div>
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-aqua-500 to-cyan-500 flex items-center justify-center text-white font-bold text-sm">A</div>
           </div>
@@ -459,56 +462,80 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-white rounded-xl border border-navy-100 p-6 shadow-sm">
                   <h3 className="font-bold text-navy-900 mb-4">Revenue Over Time</h3>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <LineChart data={revenueData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="month" stroke="#627d98" fontSize={12} />
-                      <YAxis stroke="#627d98" fontSize={12} />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="revenue" stroke="#00b3ac" strokeWidth={3} dot={{ fill: '#00b3ac', r: 4 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  {bookings.length === 0 ? (
+                    <div className="flex items-center justify-center h-[250px] text-navy-400">
+                      <p>No booking data available yet</p>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={250}>
+                      <LineChart data={revenueData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis dataKey="month" stroke="#627d98" fontSize={12} />
+                        <YAxis stroke="#627d98" fontSize={12} />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="revenue" stroke="#00b3ac" strokeWidth={3} dot={{ fill: '#00b3ac', r: 4 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
                 <div className="bg-white rounded-xl border border-navy-100 p-6 shadow-sm">
                   <h3 className="font-bold text-navy-900 mb-4">Bookings Over Time</h3>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={revenueData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="month" stroke="#627d98" fontSize={12} />
-                      <YAxis stroke="#627d98" fontSize={12} />
-                      <Tooltip />
-                      <Bar dataKey="bookings" fill="#06b6d4" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {bookings.length === 0 ? (
+                    <div className="flex items-center justify-center h-[250px] text-navy-400">
+                      <p>No booking data available yet</p>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart data={revenueData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis dataKey="month" stroke="#627d98" fontSize={12} />
+                        <YAxis stroke="#627d98" fontSize={12} />
+                        <Tooltip />
+                        <Bar dataKey="bookings" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
                 <div className="bg-white rounded-xl border border-navy-100 p-6 shadow-sm">
                   <h3 className="font-bold text-navy-900 mb-4">Popular Services</h3>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie data={serviceDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                        {serviceDistribution.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  {bookings.length === 0 ? (
+                    <div className="flex items-center justify-center h-[250px] text-navy-400">
+                      <p>No service data available yet</p>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={250}>
+                      <PieChart>
+                        <Pie data={serviceDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                          {serviceDistribution.map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
                 <div className="bg-white rounded-xl border border-navy-100 p-6 shadow-sm">
                   <h3 className="font-bold text-navy-900 mb-4">Recent Activity</h3>
-                  <div className="space-y-3">
-                    {bookings.slice(0, 5).map(booking => (
-                      <div key={booking.id} className="flex items-center justify-between p-3 rounded-lg bg-navy-50/50">
-                        <div>
-                          <p className="text-sm font-semibold text-navy-800">{booking.customerName}</p>
-                          <p className="text-xs text-navy-500">{booking.serviceType}</p>
+                  {bookings.length === 0 ? (
+                    <div className="flex items-center justify-center h-[250px] text-navy-400">
+                      <p>No recent activity</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {bookings.slice(0, 5).map(booking => (
+                        <div key={booking.id} className="flex items-center justify-between p-3 rounded-lg bg-navy-50/50">
+                          <div>
+                            <p className="text-sm font-semibold text-navy-800">{booking.customerName}</p>
+                            <p className="text-xs text-navy-500">{booking.serviceType}</p>
+                          </div>
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[booking.status]}`}>
+                            {booking.status}
+                          </span>
                         </div>
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[booking.status]}`}>
-                          {booking.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1764,27 +1791,39 @@ export default function AdminDashboard() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div className="bg-white rounded-xl border border-navy-100 p-6 shadow-sm">
                         <h3 className="font-bold text-navy-900 mb-4">Revenue Trend</h3>
-                        <ResponsiveContainer width="100%" height={250}>
-                          <LineChart data={chartData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                            <XAxis dataKey="time" stroke="#627d98" fontSize={12} />
-                            <YAxis stroke="#627d98" fontSize={12} />
-                            <Tooltip />
-                            <Line type="monotone" dataKey="revenue" stroke="#00b3ac" strokeWidth={3} dot={{ fill: '#00b3ac', r: 4 }} />
-                          </LineChart>
-                        </ResponsiveContainer>
+                        {filteredBookings.length === 0 ? (
+                          <div className="flex items-center justify-center h-[250px] text-navy-400">
+                            <p>No data for selected period</p>
+                          </div>
+                        ) : (
+                          <ResponsiveContainer width="100%" height={250}>
+                            <LineChart data={chartData}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                              <XAxis dataKey="time" stroke="#627d98" fontSize={12} />
+                              <YAxis stroke="#627d98" fontSize={12} />
+                              <Tooltip />
+                              <Line type="monotone" dataKey="revenue" stroke="#00b3ac" strokeWidth={3} dot={{ fill: '#00b3ac', r: 4 }} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        )}
                       </div>
                       <div className="bg-white rounded-xl border border-navy-100 p-6 shadow-sm">
                         <h3 className="font-bold text-navy-900 mb-4">Bookings Over Time</h3>
-                        <ResponsiveContainer width="100%" height={250}>
-                          <BarChart data={chartData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                            <XAxis dataKey="time" stroke="#627d98" fontSize={12} />
-                            <YAxis stroke="#627d98" fontSize={12} />
-                            <Tooltip />
-                            <Bar dataKey="bookings" fill="#06b6d4" radius={[4, 4, 0, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
+                        {filteredBookings.length === 0 ? (
+                          <div className="flex items-center justify-center h-[250px] text-navy-400">
+                            <p>No data for selected period</p>
+                          </div>
+                        ) : (
+                          <ResponsiveContainer width="100%" height={250}>
+                            <BarChart data={chartData}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                              <XAxis dataKey="time" stroke="#627d98" fontSize={12} />
+                              <YAxis stroke="#627d98" fontSize={12} />
+                              <Tooltip />
+                              <Bar dataKey="bookings" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        )}
                       </div>
                     </div>
 

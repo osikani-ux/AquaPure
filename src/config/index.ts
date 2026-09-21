@@ -4,7 +4,7 @@
 export const APP_CONFIG = {
   companyName: "AquaPure Tank Services",
   tagline: "Clean Tank. Safer Water.",
-  whatsappNumber: "+233241234567", // Configurable WhatsApp number
+  whatsappNumber: "+233241234567", // Configure your WhatsApp number
   whatsappMessage: "Hello, I would like to book a water tank cleaning service.",
   phone: "+233 24 123 4567",
   email: "info@aquapuretankgh.com",
@@ -14,12 +14,12 @@ export const APP_CONFIG = {
     weekdays: "Monday - Friday: 7:00 AM - 6:00 PM",
     saturday: "Saturday: 8:00 AM - 4:00 PM",
     sunday: "Sunday: Closed (Emergency services available)"
-  },
-  adminCredentials: {
-    email: "admin@aquapuretankgh.com",
-    password: "admin123" // For demo purposes only
   }
 };
+
+// Admin credentials - CHANGE THESE before deploying to production
+export const ADMIN_EMAIL = "admin@aquapuretankgh.com";
+export const ADMIN_PASSWORD = "SecureP@ss2024!";
 
 // WhatsApp link generator
 export const getWhatsAppLink = (customMessage?: string) => {

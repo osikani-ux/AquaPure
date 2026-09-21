@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Droplets, Lock, Mail, AlertCircle } from 'lucide-react';
-import { APP_CONFIG } from '../../config';
+import { APP_CONFIG, ADMIN_EMAIL, ADMIN_PASSWORD } from '../../config';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
@@ -11,7 +11,7 @@ export default function AdminLogin() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (email === APP_CONFIG.adminCredentials.email && password === APP_CONFIG.adminCredentials.password) {
+    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
       localStorage.setItem('adminAuth', 'true');
       navigate('/admin/dashboard');
     } else {
@@ -74,12 +74,6 @@ export default function AdminLogin() {
               Sign In
             </button>
           </form>
-
-          <div className="mt-6 p-4 rounded-xl bg-navy-50 border border-navy-100">
-            <p className="text-navy-500 text-xs text-center">
-              Demo credentials: admin@aquapuretankgh.com / admin123
-            </p>
-          </div>
         </div>
       </div>
     </div>

@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { Booking, Customer, ServiceRecord, Payment } from '../types';
-import { mockBookings, mockCustomers, mockServiceRecords, mockPayments } from '../data/mockData';
 
 interface ContactMessage {
   id: string;
@@ -48,14 +47,11 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [bookings, setBookings] = useState<Booking[]>(mockBookings);
-  const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
-  const [serviceRecords, setServiceRecords] = useState<ServiceRecord[]>(mockServiceRecords);
-  const [payments, setPayments] = useState<Payment[]>(mockPayments);
-  const [messages, setMessages] = useState<ContactMessage[]>([
-    { id: '1', name: 'Kwame Asante', phone: '+233 24 555 1234', email: 'kwame@email.com', message: 'I would like to know more about your commercial services.', createdAt: '2025-01-20 14:30', read: true },
-    { id: '2', name: 'Ama Mensah', phone: '+233 20 777 5678', email: 'ama@email.com', message: 'Do you service properties in Tema?', createdAt: '2025-01-22 09:15', read: false },
-  ]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [serviceRecords, setServiceRecords] = useState<ServiceRecord[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
 
   // Booking operations
   const addBooking = (bookingData: Omit<Booking, 'id' | 'createdAt' | 'status' | 'finalPrice'>): Booking => {
