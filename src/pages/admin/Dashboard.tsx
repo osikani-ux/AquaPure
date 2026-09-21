@@ -42,6 +42,29 @@ export default function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [reportPeriod, setReportPeriod] = useState('month'); // Default to month
+  
+  // Customer notes state: map of customerId -> array of notes
+  const [customerNotes, setCustomerNotes] = useState<Record<string, Array<{ id: string; text: string; createdAt: string; author: string }>>>({});
+  
+  // Modal states for Schedule Service and Add Note
+  const [showScheduleForm, setShowScheduleForm] = useState(false);
+  const [showNoteForm, setShowNoteForm] = useState(false);
+  const [scheduleSuccess, setScheduleSuccess] = useState(false);
+  const [noteSuccess, setNoteSuccess] = useState(false);
+  
+  // Schedule form state
+  const [scheduleForm, setScheduleForm] = useState({
+    serviceType: 'Professional Tank Care',
+    tankSize: '2,000L',
+    numberOfTanks: '1',
+    preferredDate: '',
+    preferredTime: '09:00 AM',
+    notes: ''
+  });
+  
+  // Note form state
+  const [noteText, setNoteText] = useState('');
+  
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -67,6 +90,75 @@ export default function AdminDashboard() {
     if (selectedBooking?.id === id) {
       setSelectedBooking(prev => prev ? { ...prev, status } : null);
     }
+  };
+
+  // Handle Schedule Service submission
+  const handleScheduleService = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCustomer) return;
+    
+    const newBooking: Booking = {
+      id: String(Date.now()),
+      customerId: selectedCustomer.id,
+      customerName: selectedCustomer.name,
+      customerPhone: selectedCustomer.phone,
+      serviceType: scheduleForm.serviceType,
+      tankSize: scheduleForm.tankSize,
+      numberOfTanks: parseInt(scheduleForm.numberOfTanks) || 1,
+      propertyType: 'Home',
+      preferredDate: scheduleForm.preferredDate,
+      preferredTime: scheduleForm.preferredTime,
+      status: 'pending',
+      estimatedPrice: 250,
+      finalPrice: null,
+      notes: scheduleForm.notes,
+      address: selectedCustomer.address,
+      location: selectedCustomer.location,
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+    
+    setBookings(prev => [newBooking, ...prev]);
+    setScheduleSuccess(true);
+    
+    // Reset form after 2 seconds
+    setTimeout(() => {
+      setShowScheduleForm(false);
+      setScheduleSuccess(false);
+      setScheduleForm({
+        serviceType: 'Professional Tank Care',
+        tankSize: '2,000L',
+        numberOfTanks: '1',
+        preferredDate: '',
+        preferredTime: '09:00 AM',
+        notes: ''
+      });
+    }, 2000);
+  };
+
+  // Handle Add Note submission
+  const handleAddNote = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCustomer || !noteText.trim()) return;
+    
+    const customerId = selectedCustomer.id;
+    const newNote = {
+      id: String(Date.now()),
+      text: noteText.trim(),
+      createdAt: new Date().toLocaleString(),
+      author: 'Admin'
+    };
+    
+    setCustomerNotes(prev => ({
+      ...prev,
+      [customerId]: [...(prev[customerId] || []), newNote]
+    }));
+    
+    setNoteSuccess(true);
+    setNoteText('');
+    
+    setTimeout(() => {
+      setNoteSuccess(false);
+    }, 2000);
   };
 
   const filteredBookings = bookings.filter(b => {
@@ -585,16 +677,248 @@ export default function AdminDashboard() {
                         </div>
                       </div>
 
+                      {/* Notes Section */}
+                      <div>
+                        <h4 className="text-sm font-semibold text-navy-700 mb-3">Notes</h4>
+                        <div className="space-y-2">
+                          {customerNotes[selectedCustomer.id]?.length > 0 ? (
+                            customerNotes[selectedCustomer.id].map(note => (
+                              <div key={note.id} className="p-3 rounded-lg bg-amber-50 border border-amber-100">
+                                <p className="text-sm text-navy-800">{note.text}</p>
+                                <p className="text-xs text-navy-500 mt-1">{note.author} • {note.createdAt}</p>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm text-navy-500 text-center py-3">No notes yet</p>
+                          )}
+                        </div>
+                      </div>
+
                       {/* Action Buttons */}
                       <div className="flex gap-3 pt-4 border-t border-navy-100">
-                        <button className="flex-1 py-3 bg-gradient-to-r from-aqua-600 to-cyan-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all">
+                        <button 
+                          onClick={() => {
+                            setShowScheduleForm(true);
+                            // Pre-populate with customer's last booking info if available
+                            const lastBooking = bookings.find(b => b.customerId === selectedCustomer.id);
+                            if (lastBooking) {
+                              setScheduleForm(prev => ({
+                                ...prev,
+                                serviceType: lastBooking.serviceType,
+                                tankSize: lastBooking.tankSize,
+                                numberOfTanks: String(lastBooking.numberOfTanks)
+                              }));
+                            }
+                          }}
+                          className="flex-1 py-3 bg-gradient-to-r from-aqua-600 to-cyan-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all"
+                        >
                           Schedule Service
                         </button>
-                        <button className="flex-1 py-3 border-2 border-navy-200 text-navy-800 rounded-xl font-semibold hover:bg-navy-50 transition-colors">
+                        <button 
+                          onClick={() => setShowNoteForm(true)}
+                          className="flex-1 py-3 border-2 border-navy-200 text-navy-800 rounded-xl font-semibold hover:bg-navy-50 transition-colors"
+                        >
                           Add Note
                         </button>
                       </div>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Schedule Service Modal */}
+              {showScheduleForm && selectedCustomer && (
+                <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={() => !scheduleSuccess && setShowScheduleForm(false)}>
+                  <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="p-6 border-b border-navy-100">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-bold text-navy-900">Schedule Service</h3>
+                          <p className="text-sm text-navy-500 mt-1">For {selectedCustomer.name}</p>
+                        </div>
+                        {!scheduleSuccess && (
+                          <button onClick={() => setShowScheduleForm(false)} className="p-2 rounded-lg hover:bg-navy-50">
+                            <XCircle className="w-5 h-5 text-navy-400" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {scheduleSuccess ? (
+                      <div className="p-8 text-center">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-clean-50 flex items-center justify-center">
+                          <CheckCircle2 className="w-10 h-10 text-clean-500" />
+                        </div>
+                        <h4 className="text-xl font-bold text-navy-900 mb-2">Service Scheduled!</h4>
+                        <p className="text-navy-600">The booking has been created and is pending confirmation.</p>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleScheduleService} className="p-6 space-y-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-navy-700 mb-1.5">Service Type *</label>
+                          <select 
+                            required
+                            value={scheduleForm.serviceType}
+                            onChange={(e) => setScheduleForm(prev => ({ ...prev, serviceType: e.target.value }))}
+                            className="w-full px-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 focus:border-aqua-500 outline-none"
+                          >
+                            <option value="Essential Tank Clean">Essential Tank Clean</option>
+                            <option value="Professional Tank Care">Professional Tank Care</option>
+                            <option value="Premium Tank Care">Premium Tank Care</option>
+                            <option value="Commercial Tank Service">Commercial Tank Service</option>
+                            <option value="Annual Care Plan">Annual Care Plan</option>
+                          </select>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-semibold text-navy-700 mb-1.5">Tank Size</label>
+                            <select 
+                              value={scheduleForm.tankSize}
+                              onChange={(e) => setScheduleForm(prev => ({ ...prev, tankSize: e.target.value }))}
+                              className="w-full px-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none"
+                            >
+                              <option value="500-1000L">500–1,000L</option>
+                              <option value="1,500-2,000L">1,500–2,000L</option>
+                              <option value="2,000L">2,000L</option>
+                              <option value="2,500-5,000L">2,500–5,000L</option>
+                              <option value="5,000-10,000L">5,000–10,000L</option>
+                              <option value="10,000L+">10,000L+</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold text-navy-700 mb-1.5">Number of Tanks</label>
+                            <input 
+                              type="number" 
+                              min="1"
+                              max="50"
+                              value={scheduleForm.numberOfTanks}
+                              onChange={(e) => setScheduleForm(prev => ({ ...prev, numberOfTanks: e.target.value }))}
+                              className="w-full px-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-semibold text-navy-700 mb-1.5">Preferred Date *</label>
+                            <input 
+                              type="date" 
+                              required
+                              value={scheduleForm.preferredDate}
+                              onChange={(e) => setScheduleForm(prev => ({ ...prev, preferredDate: e.target.value }))}
+                              className="w-full px-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold text-navy-700 mb-1.5">Preferred Time</label>
+                            <select 
+                              value={scheduleForm.preferredTime}
+                              onChange={(e) => setScheduleForm(prev => ({ ...prev, preferredTime: e.target.value }))}
+                              className="w-full px-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none"
+                            >
+                              <option value="08:00 AM">8:00 AM</option>
+                              <option value="09:00 AM">9:00 AM</option>
+                              <option value="10:00 AM">10:00 AM</option>
+                              <option value="11:00 AM">11:00 AM</option>
+                              <option value="12:00 PM">12:00 PM</option>
+                              <option value="01:00 PM">1:00 PM</option>
+                              <option value="02:00 PM">2:00 PM</option>
+                              <option value="03:00 PM">3:00 PM</option>
+                              <option value="04:00 PM">4:00 PM</option>
+                            </select>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-semibold text-navy-700 mb-1.5">Notes</label>
+                          <textarea 
+                            rows={3}
+                            value={scheduleForm.notes}
+                            onChange={(e) => setScheduleForm(prev => ({ ...prev, notes: e.target.value }))}
+                            className="w-full px-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none resize-none"
+                            placeholder="Any special requirements or notes..."
+                          />
+                        </div>
+                        
+                        <div className="flex gap-3 pt-2">
+                          <button 
+                            type="button"
+                            onClick={() => setShowScheduleForm(false)}
+                            className="flex-1 py-3 border-2 border-navy-200 text-navy-800 rounded-xl font-semibold hover:bg-navy-50 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button 
+                            type="submit"
+                            className="flex-1 py-3 bg-gradient-to-r from-aqua-600 to-cyan-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all"
+                          >
+                            Schedule Service
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Add Note Modal */}
+              {showNoteForm && selectedCustomer && (
+                <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={() => setShowNoteForm(false)}>
+                  <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+                    <div className="p-6 border-b border-navy-100">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-bold text-navy-900">Add Note</h3>
+                          <p className="text-sm text-navy-500 mt-1">For {selectedCustomer.name}</p>
+                        </div>
+                        <button onClick={() => setShowNoteForm(false)} className="p-2 rounded-lg hover:bg-navy-50">
+                          <XCircle className="w-5 h-5 text-navy-400" />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <form onSubmit={handleAddNote} className="p-6 space-y-4">
+                      {noteSuccess ? (
+                        <div className="text-center py-4">
+                          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-clean-50 flex items-center justify-center">
+                            <CheckCircle2 className="w-7 h-7 text-clean-500" />
+                          </div>
+                          <p className="font-semibold text-navy-900">Note Added!</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div>
+                            <label className="block text-sm font-semibold text-navy-700 mb-1.5">Note *</label>
+                            <textarea 
+                              required
+                              rows={4}
+                              value={noteText}
+                              onChange={(e) => setNoteText(e.target.value)}
+                              className="w-full px-4 py-3 rounded-xl border border-navy-200 text-navy-800 focus:ring-2 focus:ring-aqua-500 outline-none resize-none"
+                              placeholder="Enter your note here..."
+                            />
+                          </div>
+                          
+                          <div className="flex gap-3">
+                            <button 
+                              type="button"
+                              onClick={() => setShowNoteForm(false)}
+                              className="flex-1 py-3 border-2 border-navy-200 text-navy-800 rounded-xl font-semibold hover:bg-navy-50 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button 
+                              type="submit"
+                              disabled={!noteText.trim()}
+                              className="flex-1 py-3 bg-gradient-to-r from-aqua-600 to-cyan-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Add Note
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </form>
                   </div>
                 </div>
               )}
